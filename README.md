@@ -50,7 +50,8 @@ The driver exposes device file node under /dev/iio_device:0 and /dev/iio_device:
 2. Sysfs
 The driver also exposes a set of sysfs nodes under /sys/bus/iio/devices/iio_device:0, iio_device:1, trigger0, trigger1, where users can get information about the sensor and also control the sensor. Eg.:
 ```
-# device number 0 and 1 are dynamically assingn to accel and gyro, to find out which deveice you are working with, you can read the device name
+# device number 0 and 1 are dynamically assingn to accel and gyro. 
+# to find out which deveice you are working with, you can read the device name
 cat /sys/bus/iio/devices/iio:device0/name
 cat /sys/bus/iio/devices/iio:device1/name
 
