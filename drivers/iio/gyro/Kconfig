@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# IIO Digital Gyroscope Sensor drivers configuration
+#
+# When adding new entries keep the list in alphabetical order
+
+menu "Digital gyroscope sensors"
+
+config SMI230_GYRO
+	tristate "BOSCH SMI230 Gyro Sensor"
+	depends on (I2C || SPI_MASTER)
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  Say yes here to build support for BOSCH SMI230GYRO Tri-axis Gyro Sensor
+	  driver connected via I2C or SPI.
+
+choice
+        prompt "Select communication interface"
+        depends on SMI230_GYRO
+        help
+          Note: SPI and I2C are not supported at the same time, that is to say:
+          Choose either SPI or I2C to build the driver.
+
+    config SMI230_GYRO_SPI
+        bool "Enable SPI connection"
+        depends on SPI_MASTER
+    config SMI230_GYRO_I2C
+        bool "Enable I2C connection"
+        depends on I2C
+endchoice
+
+config SMI230_MAX_BUFFER_LEN
+        int "configue read buffer size"
+        default "1024"
+        help
+          Considering using FIFO, 1024 bytes are big enough for most cases. Do not change this value if not sure.
+
+endmenu
