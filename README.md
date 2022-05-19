@@ -1,4 +1,4 @@
-# SMI230-Sensor-API and Sensor Driver
+# SMI230 IIO Sensor-API and Sensor Driver
 
 ## Table of Contents
  - [Introduction](#Intro)
@@ -15,6 +15,8 @@ However, synchronization between accelerometer and gyroscope can be achieved:
 The software modules in this repository are provided as reference for SMI230 users and shall demonstrate exemplarily the usage of the following features
 - data synchronization.
 - data collection from FIFO.
+
+_Note: SMI230 was originally implemented as a input deveice driver. The SMI230 input driver is still avaiable in https://github.com/boschmemssolutions/SMI230-Linux-Driver. Since SMI230 is rather an Industrial I/O (IIO) than an input device. We now implemnt SMI230 as an IIO driver. Therefore the further development will only happen on the IIO driver
 
 _Note: The sensor driver utilizes sensor api, which is following BMI08x sensor api available on [github](https://github.com/BoschSensortec/BMI08x-Sensor-API/releases/tag/bmi08x_v1.4.4)._
 
