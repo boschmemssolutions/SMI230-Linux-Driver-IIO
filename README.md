@@ -36,7 +36,7 @@ See [LICENSE](drivers/iio/LICENSE.md) file
                  |          |
                sysfs       dev
                  \          /
-               input-subsystem
+                iio-subsystem
 	             |
 sensor_API <-- smi230_driver --> smi230_SPI/I2C_driver
                                            |
