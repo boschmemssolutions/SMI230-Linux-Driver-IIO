@@ -10,11 +10,6 @@
 ## Introduction <a name=Intro></a>
 
 SMI230 is a system-in-package inertial measurement unit which offers accurate acceleration and angular rate measurements.
-Due to system-in-package approach of SMI230 (two sensors in single package), the gyroscope and acceleration data is acquired in a non-synchronized manner. 
-However, synchronization between accelerometer and gyroscope can be achieved:
-The software modules in this repository are provided as reference for SMI230 users and shall demonstrate exemplarily the usage of the following features
-- data synchronization.
-- data collection from FIFO.
 
 _Note: SMI230 was originally implemented as a input deveice driver. The SMI230 input driver is still avaiable in [github](https://github.com/boschmemssolutions/SMI230-Linux-Driver). Since SMI230 is rather an Industrial I/O (IIO) than an input device. We now implement SMI230 as an IIO driver. Therefore the further development will only happen on the IIO driver._
 
