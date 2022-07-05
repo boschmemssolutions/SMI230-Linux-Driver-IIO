@@ -1,9 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0-only
-#
-# IIO Digital Gyroscope Sensor drivers configuration
-#
-# When adding new entries keep the list in alphabetical order
-
 menu "Digital gyroscope sensors"
 
 config SMI230_GYRO
@@ -28,6 +22,45 @@ choice
     config SMI230_GYRO_I2C
         bool "Enable I2C connection"
         depends on I2C
+endchoice
+
+choice
+        prompt "Select working mode"
+        depends on SMI230_GYRO
+
+    config SMI230_GYRO_NEW_DATA
+        bool "New data"
+        help
+		interrupt comes once new data is available
+    config SMI230_GYRO_FIFO
+        bool "FIFO"
+        help
+		interrupt comes once data reaches certain FIFO watermark or FIFO full
+endchoice
+
+choice
+	prompt "Select GYRO interrupt source"
+	depends on (!SMI230_DATA_SYNC) && SMI230_GYRO
+	default SMI230_GYRO_INT4
+
+    config SMI230_GYRO_INT3
+	bool "use int3 as source"
+
+    config SMI230_GYRO_INT4
+	bool "use int4 as source"
+endchoice
+
+choice
+	prompt "Select GYRO interrupt edge"
+	depends on (!SMI230_DATA_SYNC) && SMI230_GYRO
+	default SMI230_GYRO_INT_ACTIVE_HIGH
+
+    config SMI230_GYRO_INT_ACTIVE_HIGH
+	bool "interrupt is on raising edge"
+
+    config SMI230_GYRO_INT_ACTIVE_LOW
+	bool "interrupt is on falling edge"
+
 endchoice
 
 config SMI230_MAX_BUFFER_LEN

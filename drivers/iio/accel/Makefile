@@ -1,5 +1,5 @@
 #
-# Makefile for Bosch sensor driver.
+# Makefile for Bosch SMI230 Acc
 #
 
 obj-$(CONFIG_IIO_SMI230_ACC) += smi230_acc.o

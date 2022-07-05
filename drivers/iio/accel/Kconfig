@@ -4,7 +4,7 @@ config IIO_SMI230_ACC
 	tristate "Bosch Sensor SMI230 Accelerometer"
 	depends on (I2C || SPI_MASTER)
 	select IIO_BUFFER
-	select IIO_TRIGGER
+	select IIO_TRIGGERED_BUFFER
 	help
 	  Build driver for Bosch SMI230 tri-axis accelerometer sensor.
 
@@ -24,14 +24,76 @@ choice
 		depends on I2C
 endchoice
 
-if IIO_SMI230_ACC
+choice
+	prompt "Select ACC interrupt source"
+	depends on IIO_SMI230_ACC
+	default IIO_SMI230_ACC_INT2
+
+    config IIO_SMI230_ACC_INT1
+		bool "use int1 as source"
+		help
+	 	  This enables INT1 as source for ACC
+
+    config IIO_SMI230_ACC_INT2
+		bool "use int2 as source"
+		help
+	 	  This enables INT2 as source for ACC
+endchoice
+
+choice
+	prompt "Select ACC interrupt behaviour"
+	depends on IIO_SMI230_ACC
+	default IIO_SMI230_ACC_PUSH_PULL
+	
+	config IIO_SMI230_ACC_PUSH_PULL
+		bool "push-pull mode"
+		help
+		  Use push-pull mode for interrupt pin.
+		  
+	config IIO_SMI230_ACC_OPEN_DRAIN
+		bool "open-drain mode"
+		help
+		  Use open-drain mode for interrupt pin. Pull-up resistor needed!
+endchoice
+
+choice
+	prompt "Select ACC interrupt level"
+	depends on IIO_SMI230_ACC
+	default IIO_SMI230_ACC_ACTIVE_HIGH
+	
+	config IIO_SMI230_ACC_ACTIVE_LOW
+		bool "active low"
+		help
+		  Interrupt signal is active low or falling edge.
+		  
+	config IIO_SMI230_ACC_ACTIVE_HIGH
+		bool "active high"
+		help
+		  Interrupt signal is active high or rising edge.
+endchoice
+
+config IIO_SMI230_ACC_FIFO
+	bool "SMI230 ACC FIFO enable"
+	depends on IIO_SMI230_ACC
+	help
+	 enable ACC FIFO feature.
+
+choice
+	prompt "Select ACC FIFO interrupt type"
+	depends on IIO_SMI230_ACC && IIO_SMI230_ACC_FIFO
+
+    config IIO_SMI230_ACC_FIFO_WM
+		bool "use watermark threshold to generate interrupt"
+
+    config IIO_SMI230_ACC_FIFO_FULL
+		bool "generate interrupt when FIFO is full"
+endchoice
 
 config IIO_SMI230_ACC_MAX_BUFFER_LEN
+	depends on IIO_SMI230_ACC
 	int "configue read buffer size"
 	default "1024"
 	help
 	  Considering using FIFO, 1024 bytes are big enough for most cases. Do not change this value if not sure.
-
-endif
 
 endmenu

@@ -52,33 +52,81 @@ The driver also exposes a set of sysfs nodes under /sys/bus/iio/devices/iio_devi
 cat /sys/bus/iio/devices/iio:device0/name
 cat /sys/bus/iio/devices/iio:device1/name
 
+# read acc power mode 
+cat /sys/bus/iio/devices/iio:device0/in_accel_power_mode
+
+# set acc power mode
+sudo su  
+echo  [normal|suspend] > /sys/bus/iio/devices/iio:device0/in_accel_power_mode
 
 # read the avaiable acc output data rate 
-cat /sys/bus/iio/devices/iio:device1/in_accel_sampling_frequency_available    
+cat /sys/bus/iio/devices/iio:device0/in_accel_sampling_frequency_available    
 
 # read the current acc output data rate 
-cat /sys/bus/iio/devices/iio:device1/in_accel_sampling_frequency
+cat /sys/bus/iio/devices/iio:device0/in_accel_sampling_frequency
 
 # set the acc output data rate.
-sudo su 
-echo 200 > /sys/bus/iio/devices/iio:device1/in_accel_sampling_frequency
+sudo su  
+echo [12.5|25|50|100|200|400|800|1600] > /sys/bus/iio/devices/iio:device0/in_accel_sampling_frequency
 
 # read acc x raw value
-cat  /sys/bus/iio/devices/iio:device1/in_accel_x_raw
+cat  /sys/bus/iio/devices/iio:device0/in_accel_x_raw
 
+# read acc xyz and sensor time raw value
+cat  /sys/bus/iio/devices/iio:device0/in_accel_raw
+
+# read acc range
+cat  /sys/bus/iio/devices/iio:device0/in_accel_range
+
+# set acc range
+sudo su  
+echo [2|4|8|16] > /sys/bus/iio/devices/iio:device0/in_accel_range
+
+# execute acc self test acc power will be suspened after self test. you need to manually set acc power mode to normal
+cat  /sys/bus/iio/devices/iio:device0/self_test
+
+# execute acc soft reset. acc power will be suspened after soft reset. you need to manually set acc power mode to normal
+sudo su  
+echo 1 >  /sys/bus/iio/devices/iio:device0/soft_reset
+
+# read acc temprature
+cat  /sys/bus/iio/devices/iio:device0/in_temp_accel
+
+
+# read gyro power mode 
+cat /sys/bus/iio/devices/iio:device1/pwr_cfg
+
+# set gyro power mode
+sudo su  
+echo  [0:active|1:suspend|2:deep suspend] > /sys/bus/iio/devices/iio:device1/in_accel_power_mode
+
+# read gyro range 
+cat /sys/bus/iio/devices/iio:device1/range
+
+# set the gyro range
+sudo su  
+echo [125|250|500|1000|2000] > /sys/bus/iio/devices/iio:device1/range
 
 # read the avaiable gyro output data rate 
-cat  /sys/bus/iio/devices/iio:device0/sampling_frequency_available    
+cat  /sys/bus/iio/devices/iio:device1/sampling_frequency_available    
 
 # read the current gyro output data rate 
-cat  /sys/bus/iio/devices/iio:device0/in_anglvel_sampling_frequency
+cat  /sys/bus/iio/devices/iio:device1/in_anglvel_sampling_frequency
 
 # set the gyro output data rate.
-sudo su 
-echo 400 >  /sys/bus/iio/devices/iio:device0/in_anglvel_sampling_frequency
+sudo su  
+echo [100|200|400|1000|2000] >  /sys/bus/iio/devices/iio:device1/in_anglvel_sampling_frequency
 
 # read gyro x raw value
-cat  /sys/bus/iio/devices/iio:device0/in_anglvel_x_raw
+cat  /sys/bus/iio/devices/iio:device1/in_anglvel_x_raw
 
+# read gyro xyz raw value
+cat  /sys/bus/iio/devices/iio:device1/in_anglvel_raw
+
+# execute self test
+cat  /sys/bus/iio/devices/iio:device1/selftest
+
+# execute soft reset
+cat  /sys/bus/iio/devices/iio:device1/softreset
 
 ```

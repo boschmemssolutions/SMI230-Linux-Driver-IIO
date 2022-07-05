@@ -60,7 +60,7 @@
 
 #include <linux/device.h>
 
-#define DRIVER_VERSION "1.0.0"
+#define DRIVER_VERSION "1.1.0"
 #define MODULE_NAME "SMI230ACC"
 #define SENSOR_ACC_NAME "SMI230ACC"
 
@@ -188,6 +188,9 @@
 #define SMI230_ACCEL_NO_MOT_INT_ENABLE              UINT8_C(0x20)
 #define SMI230_ACCEL_ERR_INT_DISABLE                UINT8_C(0x00)
 #define SMI230_ACCEL_ERR_INT_ENABLE                 UINT8_C(0x80)
+#define SMI230_ACCEL_FIFO_WM_INT_ENABLE             UINT8_C(0x02)
+#define SMI230_ACCEL_FIFO_FULL_INT_ENABLE           UINT8_C(0x01)
+#define SMI230_ACCEL_DATA_RDY_INT_ENABLE            UINT8_C(0x80)
 
 #define SMI230_ACCEL_SOFTRESET_DELAY_MS     UINT8_C(1)
 
@@ -385,6 +388,52 @@
 #define SMI230_ACCEL_DATA_SYNC_MODE_1000HZ 0x02
 #define SMI230_ACCEL_DATA_SYNC_MODE_2000HZ 0x03
 
+#define SMI230_ACCEL_EN_MASK      UINT8_C(0x40)
+#define SMI230_ACCEL_INT1_EN_MASK UINT8_C(0x08)
+#define SMI230_ACCEL_INT2_EN_MASK UINT8_C(0x04)
+
+#define SMI230_ACCEL_EN_POS       UINT8_C(6)
+#define SMI230_ACCEL_INT1_EN_POS  UINT8_C(3)
+#define SMI230_ACCEL_INT2_EN_POS  UINT8_C(2)
+
+#define SMI230_ACC_FIFO_MODE      UINT8_C(0x01)
+#define SMI230_MAX_ACC_FIFO_BYTES 1024
+#define SMI230_MAX_ACC_FIFO_FRAME 147
+#define SMI230_FIFO_ACCEL_LENGTH  UINT8_C(6)
+#define SMI230_FIFO_WTM_LENGTH    UINT8_C(0x02)
+#define SMI230_FIFO_WTM_0_ADDR    UINT8_C(0x46)
+#define SMI230_FIFO_DATA_LENGTH   UINT8_C(0x02)
+#define SMI230_SENSOR_TIME_LENGTH UINT8_C(3)
+#define SMI230_FIFO_LENGTH_0_ADDR UINT8_C(0x24)
+#define SMI230_FIFO_DATA_ADDR     UINT8_C(0x26)
+#define SMI230_FIFO_CONFIG_0_ADDR UINT8_C(0x48)
+#define SMI230_FIFO_CONFIG_1_ADDR UINT8_C(0x49)
+#define SMI230_ACCEL_EN_MASK      UINT8_C(0x40)
+
+#define SMI230_W_FIFO_EMPTY              INT8_C(1)
+#define SMI230_W_PARTIAL_READ            INT8_C(2)
+
+#define SMI230_FIFO_INPUT_CFG_LENGTH     UINT8_C(1)
+#define SMI230_ACC_FIFO_MODE_CONFIG_MASK UINT8_C(0x01)
+
+#define SMI230_FIFO_HEADER_ACC_FRM             UINT8_C(0x84)
+#define SMI230_FIFO_HEADER_ALL_FRM             UINT8_C(0x9C)
+#define SMI230_FIFO_HEADER_SENS_TIME_FRM       UINT8_C(0x44)
+#define SMI230_FIFO_HEADER_SKIP_FRM            UINT8_C(0x40)
+#define SMI230_FIFO_HEADER_INPUT_CFG_FRM       UINT8_C(0x48)
+#define SMI230_FIFO_HEAD_OVER_READ_MSB         UINT8_C(0x80)
+#define SMI230_FIFO_SAMPLE_DROP_FRM            UINT8_C(0x50)
+
+#define SMI230_FIFO_BYTE_COUNTER_MSB_MASK      UINT8_C(0x3F)
+
+#define SMI230_ACCEL_INT1_FWM_POS              UINT8_C(1)
+#define SMI230_ACCEL_INT2_FFULL_POS            UINT8_C(4)
+#define SMI230_ACCEL_INT2_FWM_POS              UINT8_C(5)
+#define SMI230_ACCEL_INT2_FWM_MASK             UINT8_C(0x20)
+#define SMI230_ACCEL_INT2_FFULL_MASK           UINT8_C(0x10)
+#define SMI230_ACCEL_INT1_FWM_MASK             UINT8_C(0x02)
+#define SMI230_ACCEL_INT1_FFULL_MASK           UINT8_C(0x01)
+
 #define SMI230_SET_BITS(reg_var, bitname, val) \
 		((reg_var & ~(bitname##_MASK)) | \
 				((val << bitname##_POS) & bitname##_MASK))
@@ -419,12 +468,14 @@ struct smi230_sensor_data {
 	int16_t x;
 	int16_t y;
 	int16_t z;
+	uint32_t sensor_time;
 };
 
 struct smi230_sensor_data_f {
 	float x;
 	float y;
 	float z;
+	double sensor_time;
 };
 
 struct smi230_cfg {

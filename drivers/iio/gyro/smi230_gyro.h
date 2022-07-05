@@ -60,7 +60,7 @@ extern "C" {
 #include <linux/module.h>
 #include <linux/delay.h>
 
-#define DRIVER_VERSION "1.0.0"
+#define DRIVER_VERSION "1.1.0"
 #define MODULE_NAME "SMI230GYRO"
 #define SENSOR_GYRO_NAME "SMI230GYRO"
 
