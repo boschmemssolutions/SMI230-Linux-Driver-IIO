@@ -2023,7 +2023,7 @@ static irqreturn_t smi230_trigger_handler(int irq, void *p)
 		ret = smi230_fifo_flush(indio_dev, SMI230_MAX_ACC_FIFO_FRAME);
 		if (ret < 0)
 			dev_err(indio_dev->dev.parent, "Failed to read FIFO data");
-	} else if ((int_stat & SMI230_ACCEL_DATA_RDY_INT_ENABLE) != 0) {
+	} else {
 		ret = smi230_data_ready_handler(indio_dev, pf->timestamp);
 		if (ret != SMI230_OK)
 			dev_err(indio_dev->dev.parent, "Failed to read new data");
@@ -2147,7 +2147,7 @@ static ssize_t smi230_fifo_reset(struct device *dev,
 
 static IIO_CONST_ATTR(hwfifo_watermark_min, "1");
 static IIO_CONST_ATTR(hwfifo_watermark_max,
-		__stringify(SMI230_MAX_ACC_FIFO_FRAME));
+		__stringify(SMI230_MAX_ACC_FIFO_BYTES));
 static IIO_DEVICE_ATTR(hwfifo_enabled, S_IRUGO,
 		smi230_get_fifo_state, NULL, 0);
 static IIO_DEVICE_ATTR(hwfifo_watermark, S_IRUGO|S_IWUSR|S_IWGRP,
