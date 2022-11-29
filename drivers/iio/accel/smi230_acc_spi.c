@@ -44,21 +44,22 @@
  *
  **/
 
-#include <linux/types.h>
-#include <linux/spi/spi.h>
 #include <linux/module.h>
+#include <linux/spi/spi.h>
+#include <linux/types.h>
 
 #include "smi230_acc.h"
 
-#define SMI230_SPI_MAX_BUFFER_SIZE      32
+#define SMI230_SPI_MAX_BUFFER_SIZE 32
 
+static DEFINE_MUTEX(mutex);
 static uint8_t *read_buf;
 static struct spi_device *smi230_acc_device;
 
-static struct smi230_dev smi230_spi_dev;
+static struct smi230_acc_dev smi230_spi_dev;
 
 static int8_t smi230_spi_write(uint8_t dev_addr, uint8_t reg_addr,
-		uint8_t *data, uint16_t len)
+			       uint8_t *data, uint16_t len)
 {
 	struct spi_message msg;
 	uint8_t buffer[SMI230_SPI_MAX_BUFFER_SIZE + 1];
@@ -81,8 +82,8 @@ static int8_t smi230_spi_write(uint8_t dev_addr, uint8_t reg_addr,
 		return -EINVAL;
 }
 
-static int8_t smi230_spi_read(uint8_t dev_addr,
-			      uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_spi_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data,
+			      uint16_t len)
 {
 	int ret;
 	uint16_t index;
@@ -102,13 +103,19 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_message_add_tail(&xfer[1], &msg);
 
-	if (dev_addr == SMI230_ACCEL_CHIP_ID)
-		ret = spi_sync(smi230_acc_device, &msg);
-	else
+	if (dev_addr != SMI230_ACCEL_CHIP_ID)
 		return -EINVAL;
+
+	mutex_lock(&mutex);
+	ret = spi_sync(smi230_acc_device, &msg);
+	if (ret) {
+		mutex_unlock(&mutex);
+		return ret;
+	}
 
 	for (index = 0; index < len; index++)
 		data[index] = read_buf[index];
+	mutex_unlock(&mutex);
 
 	return ret;
 }
@@ -125,8 +132,8 @@ static int smi230_acc_spi_probe(struct spi_device *device)
 	}
 
 	if (read_buf == NULL)
-		read_buf =
-		    kmalloc(CONFIG_IIO_SMI230_ACC_MAX_BUFFER_LEN + 1, GFP_KERNEL);
+		read_buf = kmalloc(CONFIG_SMI230_ACC_MAX_BUFFER_LEN + 1,
+				   GFP_KERNEL);
 	if (!read_buf)
 		return SMI230_E_NULL_PTR;
 
@@ -136,9 +143,9 @@ static int smi230_acc_spi_probe(struct spi_device *device)
 	smi230_acc_device = device;
 
 	err = smi230_acc_init(&smi230_spi_dev);
-	if (err == SMI230_OK)
+	if (err == SMI230_OK) {
 		pr_info("Bosch Sensor Device %s initialized", SENSOR_ACC_NAME);
-	else {
+	} else {
 		kfree(read_buf);
 		read_buf = NULL;
 		smi230_acc_device = NULL;
@@ -153,22 +160,24 @@ static int smi230_acc_spi_probe(struct spi_device *device)
 static int smi230_acc_spi_remove(struct spi_device *device)
 {
 	if (read_buf != NULL) {
+		mutex_lock(&mutex);
 		kfree(read_buf);
 		read_buf = NULL;
+		mutex_unlock(&mutex);
 	}
-	return 0;
+	return smi230_acc_remove(&device->dev);
 }
 
-static const struct spi_device_id smi230_acc_id[] = {
-	{ SENSOR_ACC_NAME, 0 },
-	{ }
-};
+static const struct spi_device_id smi230_acc_id[] = { { SENSOR_ACC_NAME, 0 },
+						      {} };
 
 MODULE_DEVICE_TABLE(spi, smi230_acc_id);
 
 static const struct of_device_id smi230_acc_of_match[] = {
-	{.compatible = SENSOR_ACC_NAME, },
-	{ }
+	{
+		.compatible = SENSOR_ACC_NAME,
+	},
+	{}
 };
 
 MODULE_DEVICE_TABLE(of, smi230_acc_of_match);
@@ -189,7 +198,7 @@ static int __init smi230_module_init(void)
 	int err = 0;
 
 	smi230_spi_dev.delay_ms = smi230_delay;
-	smi230_spi_dev.read_write_len = 32;
+	smi230_spi_dev.read_write_len = 16;
 	smi230_spi_dev.intf = SMI230_SPI_INTF;
 	smi230_spi_dev.read = smi230_spi_read;
 	smi230_spi_dev.write = smi230_spi_write;

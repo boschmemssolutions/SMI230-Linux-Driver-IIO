@@ -6,8 +6,8 @@
  * GPL LICENSE
  * Copyright (c) 2022 Robert Bosch GmbH. All rights reserved.
  *
- * This file is free software licensed under the terms of version 2 
- * of the GNU General Public License, available from the file LICENSE-GPL 
+ * This file is free software licensed under the terms of version 2
+ * of the GNU General Public License, available from the file LICENSE-GPL
  * in the main directory of this source tree.
  *
  * BSD LICENSE
@@ -52,49 +52,47 @@
 
 #include "smi230_gyro.h"
 
-#define SMI230_MAX_RETRY_I2C_XFER 10
+#define SMI230_MAX_RETRY_I2C_XFER   10
 #define SMI230_I2C_WRITE_DELAY_TIME 10
 
 static struct i2c_adapter *smi230_i2c_adapter;
-static struct smi230_dev smi230_i2c_dev;
+static struct smi230_gyro_dev smi230_i2c_dev;
 
-static int8_t smi230_i2c_read(uint8_t dev_addr,
-	uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_i2c_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data,
+			      uint16_t len)
 {
 	int32_t retry;
 
 	struct i2c_msg msg[] = {
 		{
-		.addr = dev_addr,
-		.flags = 0,
-		.len = 1,
-		.buf = &reg_addr,
+			.addr = dev_addr,
+			.flags = 0,
+			.len = 1,
+			.buf = &reg_addr,
 		},
 
 		{
-		.addr = dev_addr,
-		.flags = I2C_M_RD,
-		.len = len,
-		.buf = data,
+			.addr = dev_addr,
+			.flags = I2C_M_RD,
+			.len = len,
+			.buf = data,
 		},
 	};
 	for (retry = 0; retry < SMI230_MAX_RETRY_I2C_XFER; retry++) {
 		if (i2c_transfer(smi230_i2c_adapter, msg, ARRAY_SIZE(msg)) > 0)
 			break;
-		else
-			usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
-				SMI230_I2C_WRITE_DELAY_TIME * 1000);
+		usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
+			     SMI230_I2C_WRITE_DELAY_TIME * 1000);
 	}
 
-	if (SMI230_MAX_RETRY_I2C_XFER <= retry) {
+	if (retry >= SMI230_MAX_RETRY_I2C_XFER)
 		return -EIO;
-	}
 
 	return 0;
 }
 
-static int8_t smi230_i2c_write(uint8_t dev_addr,
-	uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_i2c_write(uint8_t dev_addr, uint8_t reg_addr,
+			       uint8_t *data, uint16_t len)
 {
 	int32_t retry;
 	struct i2c_msg msg = {
@@ -105,20 +103,19 @@ static int8_t smi230_i2c_write(uint8_t dev_addr,
 	};
 
 	msg.buf = kmalloc(len + 1, GFP_KERNEL);
-	if (!msg.buf) {
+	if (!msg.buf)
 		return -ENOMEM;
-	}
+
 	msg.buf[0] = reg_addr;
 	memcpy(&msg.buf[1], data, len);
 	for (retry = 0; retry < SMI230_MAX_RETRY_I2C_XFER; retry++) {
 		if (i2c_transfer(smi230_i2c_adapter, &msg, 1) > 0)
 			break;
-		else
-			usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
-				SMI230_I2C_WRITE_DELAY_TIME * 1000);
+		usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
+			     SMI230_I2C_WRITE_DELAY_TIME * 1000);
 	}
 	kfree(msg.buf);
-	if (SMI230_MAX_RETRY_I2C_XFER <= retry) {
+	if (retry >= SMI230_MAX_RETRY_I2C_XFER) {
 		dump_stack();
 		return -EIO;
 	}
@@ -127,7 +124,7 @@ static int8_t smi230_i2c_write(uint8_t dev_addr,
 }
 
 static int smi230_gyro_i2c_probe(struct i2c_client *client,
-	const struct i2c_device_id *id)
+				 const struct i2c_device_id *id)
 {
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_dbg(&client->dev, "i2c_check_functionality error!");
@@ -135,22 +132,28 @@ static int smi230_gyro_i2c_probe(struct i2c_client *client,
 	}
 
 	smi230_i2c_adapter = client->adapter;
-	dev_dbg(&client->dev, "%s i2c adapter is at %x", SENSOR_GYRO_NAME, (unsigned int)client->adapter);
+	dev_dbg(&client->dev, "%s i2c adapter is at %x", SENSOR_GYRO_NAME,
+		(unsigned int)client->adapter);
 
 	smi230_i2c_dev.gyro_id = client->addr;
 
 	return smi230_gyro_core_probe(&client->dev, &smi230_i2c_dev);
 }
 
-static const struct i2c_device_id smi230_gyro_id[] = {
-	{ SENSOR_GYRO_NAME, 0 },
-	{ }
-};
+static int smi230_gyro_i2c_remove(struct i2c_client *client)
+{
+	return smi230_gyro_core_remove(&client->dev);
+}
+
+static const struct i2c_device_id smi230_gyro_id[] = { { SENSOR_GYRO_NAME, 0 },
+						       {} };
 MODULE_DEVICE_TABLE(i2c, smi230_gyro_id);
 
 static const struct of_device_id smi230_gyro_of_match[] = {
-	{ .compatible = SENSOR_GYRO_NAME, },
-	{ }
+	{
+		.compatible = SENSOR_GYRO_NAME,
+	},
+	{}
 };
 MODULE_DEVICE_TABLE(of, smi230_gyro_of_match);
 
@@ -162,15 +165,16 @@ static struct i2c_driver smi230_gyro_driver = {
 	},
 	.id_table = smi230_gyro_id,
 	.probe    = smi230_gyro_i2c_probe,
+	.remove = smi230_gyro_i2c_remove,
 };
 
 static int __init smi230_gyro_module_init(void)
 {
 	int err = 0;
 
-	smi230_i2c_dev.delay_ms = smi230_delay;
+	smi230_i2c_dev.delay_ms = smi230_gyro_delay;
 	smi230_i2c_dev.read_write_len = 32;
-	smi230_i2c_dev.intf = SMI230_I2C_INTF;
+	smi230_i2c_dev.intf = SMI230_GYRO_I2C_INTF;
 	smi230_i2c_dev.read = smi230_i2c_read;
 	smi230_i2c_dev.write = smi230_i2c_write;
 

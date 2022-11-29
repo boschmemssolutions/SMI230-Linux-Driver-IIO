@@ -44,47 +44,47 @@
  *
  **/
 
-#include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/types.h>
 
 #include "smi230_acc.h"
 
-#define SMI230_MAX_RETRY_I2C_XFER 10
+#define SMI230_MAX_RETRY_I2C_XFER   10
 #define SMI230_I2C_WRITE_DELAY_TIME 10
 
 static struct i2c_adapter *smi230_i2c_adapter;
 
-static struct smi230_dev smi230_i2c_dev;
+static struct smi230_acc_dev smi230_i2c_dev;
 
-static int8_t smi230_i2c_read(uint8_t dev_addr, uint8_t reg_addr,
-		uint8_t *data, uint16_t len)
+static int8_t smi230_i2c_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data,
+			      uint16_t len)
 {
 	int32_t retry;
 
 	struct i2c_msg msg[] = {
 		{
-		 .addr = dev_addr,
-		 .flags = 0,
-		 .len = 1,
-		 .buf = &reg_addr,
-		  },
+			.addr = dev_addr,
+			.flags = 0,
+			.len = 1,
+			.buf = &reg_addr,
+		},
 
 		{
-		 .addr = dev_addr,
-		 .flags = I2C_M_RD,
-		 .len = len,
-		 .buf = data,
-		  },
+			.addr = dev_addr,
+			.flags = I2C_M_RD,
+			.len = len,
+			.buf = data,
+		},
 	};
 	for (retry = 0; retry < SMI230_MAX_RETRY_I2C_XFER; retry++) {
 		if (i2c_transfer(smi230_i2c_adapter, msg, ARRAY_SIZE(msg)) > 0)
 			break;
 
 		usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
-				 SMI230_I2C_WRITE_DELAY_TIME * 1000);
+			     SMI230_I2C_WRITE_DELAY_TIME * 1000);
 	}
 
 	if (retry >= SMI230_MAX_RETRY_I2C_XFER) {
@@ -95,8 +95,8 @@ static int8_t smi230_i2c_read(uint8_t dev_addr, uint8_t reg_addr,
 	return 0;
 }
 
-static int8_t smi230_i2c_write(uint8_t dev_addr,
-			       uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_i2c_write(uint8_t dev_addr, uint8_t reg_addr,
+			       uint8_t *data, uint16_t len)
 {
 	int32_t retry;
 	struct i2c_msg msg = {
@@ -118,7 +118,7 @@ static int8_t smi230_i2c_write(uint8_t dev_addr,
 			break;
 
 		usleep_range(SMI230_I2C_WRITE_DELAY_TIME * 1000,
-				 SMI230_I2C_WRITE_DELAY_TIME * 1000);
+			     SMI230_I2C_WRITE_DELAY_TIME * 1000);
 	}
 
 	kfree(msg.buf);
@@ -148,24 +148,28 @@ static int smi230_acc_i2c_probe(struct i2c_client *client,
 	err = smi230_acc_init(&smi230_i2c_dev);
 	if (err == SMI230_OK)
 		pr_info("Bosch Sensor Device %s initialized", SENSOR_ACC_NAME);
-	else {
+	else
 		pr_err("Bosch Sensor Device %s initialization failed, error %d",
 		       SENSOR_ACC_NAME, err);
-	}
 
 	return smi230_acc_probe(&client->dev, &smi230_i2c_dev);
 }
 
-static const struct i2c_device_id smi230_acc_id[] = {
-	{ SENSOR_ACC_NAME, 0 },
-	{ }
-};
+static int smi230_acc_i2c_remove(struct i2c_client *client)
+{
+	return smi230_acc_remove(&client->dev);
+}
+
+static const struct i2c_device_id smi230_acc_id[] = { { SENSOR_ACC_NAME, 0 },
+						      {} };
 
 MODULE_DEVICE_TABLE(i2c, smi230_acc_id);
 
 static const struct of_device_id smi230_acc_of_match[] = {
-	{.compatible = SENSOR_ACC_NAME, },
-	{ }
+	{
+		.compatible = SENSOR_ACC_NAME,
+	},
+	{}
 };
 
 MODULE_DEVICE_TABLE(of, smi230_acc_of_match);
@@ -179,7 +183,7 @@ struct i2c_driver smi230_acc_driver = {
 	.class = I2C_CLASS_HWMON,
 	.id_table = smi230_acc_id,
 	.probe = smi230_acc_i2c_probe,
-	.remove = NULL,
+	.remove = smi230_acc_i2c_remove,
 };
 
 static int __init smi230_module_init(void)
@@ -187,7 +191,7 @@ static int __init smi230_module_init(void)
 	int err = 0;
 
 	smi230_i2c_dev.delay_ms = smi230_delay;
-	smi230_i2c_dev.read_write_len = 32;
+	smi230_i2c_dev.read_write_len = 16;
 	smi230_i2c_dev.intf = SMI230_I2C_INTF;
 	smi230_i2c_dev.read = smi230_i2c_read;
 	smi230_i2c_dev.write = smi230_i2c_write;

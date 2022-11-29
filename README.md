@@ -17,6 +17,10 @@ _Note: The sensor driver utilizes sensor api, which is following BMI08x sensor a
 
 _Note: The data synchronization feature utilizes sensor configuration, which is following BMI08x sensor configuration available on [github](https://github.com/BoschSensortec/BMI08x-Sensor-API/releases/tag/bmi08x_v1.2.0)._
 
+## Documentation <a name=Doc></a>
+
+https://boschmemssolutions.github.io/iio/bosch_smi230_IIO.html
+
 ## License <a name=License></a>
 See [LICENSE](drivers/iio/LICENSE.md) file
 

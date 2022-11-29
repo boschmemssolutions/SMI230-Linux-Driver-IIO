@@ -1,6 +1,6 @@
 menu "Accelerometers"
 
-config IIO_SMI230_ACC
+config SMI230_ACC
 	tristate "Bosch Sensor SMI230 Accelerometer"
 	depends on (I2C || SPI_MASTER)
 	select IIO_BUFFER
@@ -10,47 +10,76 @@ config IIO_SMI230_ACC
 
 choice
 	prompt "Select communication interface"
-	depends on IIO_SMI230_ACC
+	depends on SMI230_ACC
 	help
 	  Note: SPI and I2C are not supported at the same time, that is to say:
 	  Choose either SPI or I2C to build the driver.
 
-    config IIO_SMI230_ACC_SPI
+    config SMI230_ACC_SPI
 		bool "Enable SPI connection"
 		depends on SPI_MASTER
 
-    config IIO_SMI230_ACC_I2C
+    config SMI230_ACC_I2C
 		bool "Enable I2C connection"
 		depends on I2C
 endchoice
 
 choice
-	prompt "Select ACC interrupt source"
-	depends on IIO_SMI230_ACC
-	default IIO_SMI230_ACC_INT2
+	prompt "Select operating mode"
+	depends on SMI230_ACC
+	default SMI230_ACC_DATA_RDY
+	help
+	  New Data:  interrupt when new acceleration data is available.
+	  FIFO:      use hardware fifo and issue interrupt on specific fill level.
+	  Data Sync: synchronize data between SMI230 accelerometer and gyro.
 
-    config IIO_SMI230_ACC_INT1
+	config SMI230_ACC_DATA_RDY
+		bool "New data mode"
+	config SMI230_ACC_FIFO
+		bool "FIFO mode"
+	config SMI230_ACC_DATA_SYNC
+		bool "Data Sync mode"
+endchoice
+
+choice
+	prompt "Select ACC FIFO interrupt type"
+	depends on SMI230_ACC && SMI230_ACC_FIFO
+
+    config SMI230_ACC_FIFO_WM
+		bool "use watermark threshold to generate interrupt"
+
+    config SMI230_ACC_FIFO_FULL
+		bool "generate interrupt when FIFO is full"
+endchoice
+
+choice
+	prompt "Select interrupt source"
+	depends on SMI230_ACC
+	default SMI230_ACC_INT2
+
+    config SMI230_ACC_INT1
+		depends on !SMI230_ACC_DATA_SYNC
 		bool "use int1 as source"
 		help
-	 	  This enables INT1 as source for ACC
+		  This enables INT1 as source for ACC, due to development board hardware design, the int1 pin is not for datasync mode
 
-    config IIO_SMI230_ACC_INT2
+    config SMI230_ACC_INT2
 		bool "use int2 as source"
 		help
 	 	  This enables INT2 as source for ACC
 endchoice
 
 choice
-	prompt "Select ACC interrupt behaviour"
-	depends on IIO_SMI230_ACC
-	default IIO_SMI230_ACC_PUSH_PULL
+	prompt "Select interrupt behaviour"
+	depends on SMI230_ACC
+	default SMI230_ACC_PUSH_PULL
 	
-	config IIO_SMI230_ACC_PUSH_PULL
+	config SMI230_ACC_PUSH_PULL
 		bool "push-pull mode"
 		help
 		  Use push-pull mode for interrupt pin.
 		  
-	config IIO_SMI230_ACC_OPEN_DRAIN
+	config SMI230_ACC_OPEN_DRAIN
 		bool "open-drain mode"
 		help
 		  Use open-drain mode for interrupt pin. Pull-up resistor needed!
@@ -58,39 +87,22 @@ endchoice
 
 choice
 	prompt "Select ACC interrupt level"
-	depends on IIO_SMI230_ACC
-	default IIO_SMI230_ACC_ACTIVE_HIGH
+	depends on SMI230_ACC
+	default SMI230_ACC_ACTIVE_HIGH
 	
-	config IIO_SMI230_ACC_ACTIVE_LOW
+	config SMI230_ACC_ACTIVE_LOW
 		bool "active low"
 		help
 		  Interrupt signal is active low or falling edge.
 		  
-	config IIO_SMI230_ACC_ACTIVE_HIGH
+	config SMI230_ACC_ACTIVE_HIGH
 		bool "active high"
 		help
 		  Interrupt signal is active high or rising edge.
 endchoice
 
-config IIO_SMI230_ACC_FIFO
-	bool "SMI230 ACC FIFO enable"
-	depends on IIO_SMI230_ACC
-	help
-	 enable ACC FIFO feature.
-
-choice
-	prompt "Select ACC FIFO interrupt type"
-	depends on IIO_SMI230_ACC && IIO_SMI230_ACC_FIFO
-
-    config IIO_SMI230_ACC_FIFO_WM
-		bool "use watermark threshold to generate interrupt"
-
-    config IIO_SMI230_ACC_FIFO_FULL
-		bool "generate interrupt when FIFO is full"
-endchoice
-
-config IIO_SMI230_ACC_MAX_BUFFER_LEN
-	depends on IIO_SMI230_ACC
+config SMI230_ACC_MAX_BUFFER_LEN
+	depends on SMI230_ACC
 	int "configue read buffer size"
 	default "1024"
 	help

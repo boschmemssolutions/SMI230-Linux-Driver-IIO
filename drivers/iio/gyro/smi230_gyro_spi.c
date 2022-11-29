@@ -6,8 +6,8 @@
  * GPL LICENSE
  * Copyright (c) 2022 Robert Bosch GmbH. All rights reserved.
  *
- * This file is free software licensed under the terms of version 2 
- * of the GNU General Public License, available from the file LICENSE-GPL 
+ * This file is free software licensed under the terms of version 2
+ * of the GNU General Public License, available from the file LICENSE-GPL
  * in the main directory of this source tree.
  *
  * BSD LICENSE
@@ -43,21 +43,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  **/
- 
+
 #include <linux/types.h>
 #include <linux/spi/spi.h>
 #include <linux/module.h>
 
 #include "smi230_gyro.h"
-#define MODULE_TAG MODULE_NAME
-#define SMI230_SPI_MAX_BUFFER_SIZE      32
+#define MODULE_TAG		   MODULE_GYRO_NAME
+#define SMI230_SPI_MAX_BUFFER_SIZE 32
 
-static uint8_t *read_buf = NULL;
+static DEFINE_MUTEX(mutex);
+static uint8_t *read_buf;
 static struct spi_device *smi230_gyro_device;
-static struct smi230_dev smi230_spi_dev;
+static struct smi230_gyro_dev smi230_spi_dev;
 
-static int8_t smi230_spi_write(uint8_t dev_addr,
-	uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_spi_write(uint8_t dev_addr, uint8_t reg_addr,
+			       uint8_t *data, uint16_t len)
 {
 	struct spi_message msg;
 	uint8_t buffer[SMI230_SPI_MAX_BUFFER_SIZE + 1];
@@ -77,8 +78,8 @@ static int8_t smi230_spi_write(uint8_t dev_addr,
 	return spi_sync(smi230_gyro_device, &msg);
 }
 
-static int8_t smi230_spi_read(uint8_t dev_addr,
-	uint8_t reg_addr, uint8_t *data, uint16_t len)
+static int8_t smi230_spi_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data,
+			      uint16_t len)
 {
 	int ret;
 	uint16_t index;
@@ -98,12 +99,16 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_message_add_tail(&xfer[1], &msg);
 
+	mutex_lock(&mutex);
 	ret = spi_sync(smi230_gyro_device, &msg);
+	if (ret) {
+		mutex_unlock(&mutex);
+		return ret;
+	}
 
 	for (index = 0; index < len; index++)
-	{
 		data[index] = read_buf[index];
-	}
+	mutex_unlock(&mutex);
 
 	return ret;
 }
@@ -121,10 +126,10 @@ static int smi230_gyro_spi_probe(struct spi_device *device)
 	}
 
 	if (read_buf == NULL)
-		read_buf = kmalloc(CONFIG_SMI230_MAX_BUFFER_LEN + 1, GFP_KERNEL);
-        if (!read_buf) {
+		read_buf = kmalloc(CONFIG_SMI230_GYRO_MAX_BUFFER_LEN + 1,
+				   GFP_KERNEL);
+	if (!read_buf)
 		return -ENOMEM;
-        }
 
 	smi230_gyro_device = device;
 
@@ -134,21 +139,23 @@ static int smi230_gyro_spi_probe(struct spi_device *device)
 static int smi230_gyro_spi_remove(struct spi_device *device)
 {
 	if (read_buf != NULL) {
+		mutex_lock(&mutex);
 		kfree(read_buf);
 		read_buf = NULL;
+		mutex_unlock(&mutex);
 	}
-	return 0;
+	return smi230_gyro_core_remove(&device->dev);
 }
 
-static const struct spi_device_id smi230_gyro_id[] = {
-	{ SENSOR_GYRO_NAME, 0 },
-	{ }
-};
+static const struct spi_device_id smi230_gyro_id[] = { { SENSOR_GYRO_NAME, 0 },
+						       {} };
 MODULE_DEVICE_TABLE(spi, smi230_gyro_id);
 
 static const struct of_device_id smi230_gyro_of_match[] = {
-	{ .compatible = SENSOR_GYRO_NAME, },
-	{ }
+	{
+		.compatible = SENSOR_GYRO_NAME,
+	},
+	{}
 };
 MODULE_DEVICE_TABLE(of, smi230_gyro_of_match);
 
@@ -167,9 +174,9 @@ static int __init smi230_module_init(void)
 {
 	int err = 0;
 
-	smi230_spi_dev.delay_ms = smi230_delay;
+	smi230_spi_dev.delay_ms = smi230_gyro_delay;
 	smi230_spi_dev.read_write_len = 32;
-	smi230_spi_dev.intf = SMI230_SPI_INTF;
+	smi230_spi_dev.intf = SMI230_GYRO_SPI_INTF;
 	smi230_spi_dev.read = smi230_spi_read;
 	smi230_spi_dev.write = smi230_spi_write;
 

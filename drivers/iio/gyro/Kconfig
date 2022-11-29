@@ -36,11 +36,15 @@ choice
         bool "FIFO"
         help
 		interrupt comes once data reaches certain FIFO watermark or FIFO full
+    config SMI230_GYRO_DATA_SYNC
+        bool "Data sync"
+        help
+		GYRO will sync up with ACC for data sampling
 endchoice
 
 choice
 	prompt "Select GYRO interrupt source"
-	depends on (!SMI230_DATA_SYNC) && SMI230_GYRO
+	depends on (!SMI230_GYRO_DATA_SYNC) && SMI230_GYRO
 	default SMI230_GYRO_INT4
 
     config SMI230_GYRO_INT3
@@ -52,7 +56,7 @@ endchoice
 
 choice
 	prompt "Select GYRO interrupt edge"
-	depends on (!SMI230_DATA_SYNC) && SMI230_GYRO
+	depends on (!SMI230_GYRO_DATA_SYNC) && SMI230_GYRO
 	default SMI230_GYRO_INT_ACTIVE_HIGH
 
     config SMI230_GYRO_INT_ACTIVE_HIGH
@@ -63,7 +67,8 @@ choice
 
 endchoice
 
-config SMI230_MAX_BUFFER_LEN
+config SMI230_GYRO_MAX_BUFFER_LEN
+	depends on SMI230_GYRO
         int "configue read buffer size"
         default "1024"
         help
