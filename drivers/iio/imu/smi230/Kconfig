@@ -1,0 +1,75 @@
+config SMI230
+	tristate "Bosch Sensor SMI230 Inertial Measurement Unit"
+	depends on (I2C || SPI)
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  Build driver for Bosch SMI230 sensor.
+
+if SMI230
+
+choice
+	prompt "Select communication interface"
+	help
+	  Note: SPI, I2C are not supported at the same time, that is to say:
+	  Choose either SPI, or I2C to build the driver.
+
+	config SMI230_SPI
+		bool "Enable SPI connection"
+		depends on SPI_MASTER
+		select REGMAP_SPI
+	config SMI230_I2C
+		bool "Enable I2C connection"
+		depends on I2C
+		select REGMAP_I2C
+endchoice
+
+choice
+	prompt "Select interrupt operation mode"
+	help
+	  Note: data-ready, fifo-full and fifo-wm are not supported at the same time, that is to say:
+	  Choose one of the three operation modes to build the driver.
+
+	config SMI230_DATA_READY
+		bool "Enable data-ready interrupt"
+		
+	config SMI230_FIFO_FULL
+		bool "Enable fifo-full interrupt"
+
+	config SMI230_FIFO_WM
+		bool "Enable fifo-wm interrupt"		
+endchoice
+
+choice
+	prompt "Select ACC interrupt ouput pin"
+	depends on SMI230
+	default SMI230_ACC_INT2
+
+    config SMI230_ACC_INT1
+		bool "use int1 as interrupt ouput"
+		help
+	 	  This maps the ACC interrupt to int1
+
+    config SMI230_ACC_INT2
+		bool "use int2 as interrupt ouput"
+		help
+	 	  This maps the ACC interrupt to int2
+endchoice
+
+choice
+	prompt "Select GYRO interrupt ouput pin"
+	depends on SMI230
+	default SMI230_GYRO_INT4
+
+    config SMI230_GYRO_INT3
+		bool "use int3 as source"
+		help
+	 	  This maps the GYRO interrupt to int3
+
+    config SMI230_GYRO_INT4
+		bool "use int4 as source"
+		help
+	 	  This maps the GYRO interrupt to int4
+endchoice
+
+endif  # SMI230
