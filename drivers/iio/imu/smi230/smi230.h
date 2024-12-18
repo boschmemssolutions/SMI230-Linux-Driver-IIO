@@ -68,10 +68,14 @@
 #define SMI230_ACC_SENSORTIME_2_REG 0x1A
 #define SMI230_ACC_INT_STAT_0_REG 0x1C
 #define SMI230_ACC_INT_STAT_1_REG 0x1D
-#define SMI230_ACC_GP_0_REG 0x1E
+#define SMI230_SYNC_X_LSB_REG 0x1E
+#define SMI230_SYNC_X_MSB_REG 0x1F
+#define SMI230_SYNC_Y_LSB_REG 0x20
+#define SMI230_SYNC_Y_MSB_REG 0x21
 #define SMI230_TEMP_MSB_REG 0x22
 #define SMI230_TEMP_LSB_REG 0x23
-#define SMI230_ACC_GP_4_REG 0x27
+#define SMI230_SYNC_Z_LSB_REG 0x27
+#define SMI230_SYNC_Z_MSB_REG 0x28
 #define SMI230_REG_ORIENT_HIGHG_OUT_REG 0x29
 #define SMI230_ACC_INTERNAL_STAT_REG 0x2A
 #define SMI230_ACC_CONF_REG 0x40
@@ -146,6 +150,9 @@
 #define SMI230_ACC_FIFO_HEADER_SKIP_FRM 0x40
 #define SMI230_ACC_FIFO_HEADER_INPUT_CFG_FRM 0x48
 #define SMI230_ACC_FIFO_SAMPLE_DROP_FRM 0x50
+#define SMI230_ACC_SOFT_RESET_CMD 0xB6
+
+#define SMI230_CONFIG_STREAM_SIZE 6144
 
 //###################################### GYRO ##############################################
 
@@ -257,6 +264,55 @@
 #define SMI230_INT_ACTIVE_LOW 0
 #define SMI230_INT_ACTIVE_HIGH 1
 
+#define SMI230_ANYMOTION_ADR 0x00
+#define SMI230_DATA_SYNC_ADR 0x02
+#define SMI230_HIGH_G_START_ADR 0x03
+#define SMI230_LOW_G_START_ADR 0x06
+#define SMI230_ORIENT_START_ADR 0x09
+#define SMI230_NOMOTION_START_ADR 0x0B
+
+#define SMI230_DATA_SYNC_OFF 0x00
+#define SMI230_DATA_SYNC_400HZ 0x01
+#define SMI230_DATA_SYNC_1000HZ 0x02
+#define SMI230_DATA_SYNC_2000HZ 0x03
+#define SMI230_DATA_SYNC_100HZ 0x04
+#define SMI230_DATA_SYNC_200HZ 0x05
+
+#define SMI230_CONFIG_STATUS_MASK 0x07
+#define SMI230_FEATURE_REG_BASE 0x10
+#define SMI230_ANYMOTION_LEN 2
+#define SMI230_NOMOTION_LEN 2
+#define SMI230_HIGH_G_LEN 3
+#define SMI230_LOW_G_LEN 3
+#define SMI230_ORIENT_LEN 2
+
+#define SMI230_ANYMOTION_THRESHOLD_MASK 0x07FF
+#define SMI230_ANYMOTION_THRESHOLD_SHIFT 0x00
+#define SMI230_ANYMOTION_NOMOTION_SEL_MASK 0x0800
+#define SMI230_ANYMOTION_NOMOTION_SEL_SHIFT 0x0B
+#define SMI230_ANYMOTION_DURATION_MASK 0x1FFF
+#define SMI230_ANYMOTION_DURATION_SHIFT 0x00
+#define SMI230_ANYMOTION_X_EN_MASK 0x2000
+#define SMI230_ANYMOTION_X_EN_SHIFT 0x0D
+#define SMI230_ANYMOTION_Y_EN_MASK 0x4000
+#define SMI230_ANYMOTION_Y_EN_SHIFT 0x0E
+#define SMI230_ANYMOTION_Z_EN_MASK 0x8000
+#define SMI230_ANYMOTION_Z_EN_SHIFT 0x0F
+
+#define SMI230_NOMOTION_THRESHOLD_MASK 0x07FF
+#define SMI230_NOMOTION_EN_MASK 0x0800
+#define SMI230_NOMOTION_DURATION_MASK 0x1FFF
+#define SMI230_NOMOTION_X_EN_MASK 0x2000
+#define SMI230_NOMOTION_Y_EN_MASK 0x4000
+#define SMI230_NOMOTION_Z_EN_MASK 0x8000
+
+#define SMI230_NOMOTION_THRESHOLD_POS 0
+#define SMI230_NOMOTION_EN_POS 11
+#define SMI230_NOMOTION_DURATION_POS 0
+#define SMI230_NOMOTION_X_EN_POS 13
+#define SMI230_NOMOTION_Y_EN_POS 14
+#define SMI230_NOMOTION_Z_EN_POS 15
+
 struct smi230_sensor_data {
 	s16 x;
 	s16 y;
@@ -267,8 +323,38 @@ enum {
 	SMI230_ACC_X,
 	SMI230_ACC_Y,
 	SMI230_ACC_Z,
+#ifdef CONFIG_SMI230_DATA_SYNC
+	DSYNC_GYRO_X,
+	DSYNC_GYRO_Y,
+	DSYNC_GYRO_Z,
+#endif
 	SMI230_ACC_TEMP,
 	SMI230_SCAN_TIMESTAMP,
+};
+
+struct smi230_anymotion_cfg {
+	/* 11 bit threshold of anymotion detection
+	 * (threshold = X mg * 2,048 (5.11 format))
+	 */
+	u16 threshold;
+	u8 enable;
+
+	/* 13 bit set the duration for any- and nomotion
+	 * (time = duration * 20ms (@50Hz))
+	 */
+	u16 duration;
+	u8 x_en;
+	u8 y_en;
+	u8 z_en;
+};
+
+struct smi230_nomotion_cfg {
+	u16 duration;
+	u16 threshold;
+	u8 x_en;
+	u8 y_en;
+	u8 z_en;
+	u8 enable;
 };
 
 union smi230acc_fifo_config0 {
@@ -288,6 +374,19 @@ union smi230acc_fifo_config1 {
 		u8 be1 : 2; /*! must be 1 */
 		u8 acc_en : 1; /*! enables storing of accelerometer sensor data */
 		u8 reserved2 : 1; /*! Reserved */
+	} fields;
+	int value;
+};
+
+union smi230acc_int_status0 {
+	struct {
+		u8 data_sync_out : 1; /*! data_sync interrupt */
+		u8 any_mot_out : 1; /*! any-motion interrupt */
+		u8 high_g_out : 1; /*! high-g interrupt */
+		u8 low_g_out : 1; /*! low-g interrupt */
+		u8 orient_out : 1; /*! orientation interrupt */
+		u8 no_mot_out : 1; /*! no-motion interrupt */
+		u8 reserved : 2; /*! reserved*/
 	} fields;
 	int value;
 };
@@ -348,6 +447,32 @@ union smi230acc_data_int_mapping {
 	int value;
 };
 
+union smi230acc_feature_int1_mapping {
+	struct {
+		u8 data_sync_out : 1; /*! map data sync to int1*/
+		u8 any_mot_out : 1; /*! map any motion to int1*/
+		u8 high_g_out : 1; /*! map high g to int1*/
+		u8 low_g_out : 1; /*! map low g to int1 */
+		u8 orient_out : 1; /*! map orientation full to int1*/
+		u8 no_mot_out : 1; /*! map no motionto int1*/
+		u8 reserved : 2; /*! Reserved*/
+	} fields;
+	int value;
+};
+
+union smi230acc_feature_int2_mapping {
+	struct {
+		u8 data_sync_out : 1; /*! map data sync to int2*/
+		u8 any_mot_out : 1; /*! map any motion to int2*/
+		u8 high_g_out : 1; /*! map high g to int2*/
+		u8 low_g_out : 1; /*! map low g to int2*/
+		u8 orient_out : 1; /*! map orientation full to int2*/
+		u8 no_mot_out : 1; /*! map no motionto int2*/
+		u8 reserved : 2; /*! Reserved*/
+	} fields;
+	int value;
+};
+
 union smi230acc_int1_conf {
 	struct {
 		u8 reserved1 : 1; /*!Reserved*/
@@ -378,10 +503,14 @@ struct smi230acc_cfg {
 	union smi230acc_acc_conf acc_conf;
 	union smi230acc_range range;
 	union smi230acc_data_int_mapping data_int_mapping;
+	union smi230acc_feature_int1_mapping feature_int1_mapping;
+	union smi230acc_feature_int2_mapping feature_int2_mapping;
 	union smi230acc_int1_conf int1_conf;
 	union smi230acc_int2_conf int2_conf;
 	union smi230acc_fifo_config0 fifo_config0;
 	union smi230acc_fifo_config1 fifo_config1;
+	struct smi230_anymotion_cfg anymotion_cfg;
+	struct smi230_nomotion_cfg nomotion_cfg;
 	u16 fifo_wm_in_frame;
 	int irq;
 	int irq_type;
@@ -392,9 +521,11 @@ struct smi230acc_data {
 	struct regmap *regmap;
 	struct iio_trigger *trig;
 	struct smi230acc_cfg cfg;
+	union smi230acc_int_status0 int_status0;
 	union smi230acc_int_status1 int_status1;
 	s64 current_timestamp;
 	s64 last_timestamp;
+	s64 last_data_sync_timestamp;
 	bool first_irq;
 	struct mutex lock;
 	u8 fifo_buf[SMI230_ACC_MAX_FIFO_BYTES];
@@ -526,5 +657,10 @@ struct smi230gyro_data {
 int smi230acc_core_probe(struct device *dev, struct regmap *regmap);
 
 int smi230gyro_core_probe(struct device *dev, struct regmap *regmap);
+
+int smi230gyro_read_registers(unsigned int reg, void *val, size_t val_count);
+
+int smi230gyro_write_registers(unsigned int reg, const void *val,
+			       size_t val_count);
 
 #endif /* _SMI230_H */

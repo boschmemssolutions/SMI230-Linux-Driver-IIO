@@ -83,6 +83,28 @@ static const struct iio_chan_spec smi230gyro_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(SMI230_SCAN_TIMESTAMP),
 };
 
+static struct smi230gyro_data *drv_data;
+
+int smi230gyro_read_registers(unsigned int reg, void *val, size_t val_count)
+{
+	int ret;
+
+	ret = regmap_bulk_read(drv_data->regmap, reg, val, val_count);
+	if (ret)
+		return ret;
+	return 0;
+}
+
+int smi230gyro_write_registers(unsigned int reg, const void *val,
+			       size_t val_count)
+{
+	int ret;
+	ret = regmap_bulk_write(drv_data->regmap, reg, val, val_count);
+	if (ret)
+		return ret;
+	return 0;
+}
+
 static int smi230_gyro_get_data(const struct smi230gyro_data *data,
 				struct smi230_sensor_data *gyro)
 {
@@ -133,6 +155,18 @@ static int smi230gyro_read_raw(struct iio_dev *indio_dev,
 	return 0;
 }
 
+static int smi230gyro_set_bw(struct smi230gyro_data *data, u8 bw)
+{
+	int ret;
+	data->cfg.bw_odr.fields.bw = bw;
+	ret = regmap_write(data->regmap, SMI230_GYRO_BANDWIDTH_REG,
+			   data->cfg.bw_odr.value);
+	if (ret)
+		return ret;
+	return 0;
+}
+
+#ifndef CONFIG_SMI230_DATA_SYNC
 static ssize_t bw_odr_show(struct device *dev, struct device_attribute *attr,
 			   char *buf)
 {
@@ -169,17 +203,6 @@ static ssize_t bw_odr_show(struct device *dev, struct device_attribute *attr,
 	return 0;
 }
 
-static int smi230gyro_set_bw(struct smi230gyro_data *data, u8 bw)
-{
-	int ret;
-	data->cfg.bw_odr.fields.bw = bw;
-	ret = regmap_write(data->regmap, SMI230_GYRO_BANDWIDTH_REG,
-			   data->cfg.bw_odr.value);
-	if (ret)
-		return ret;
-	return 0;
-}
-
 static ssize_t bw_odr_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
@@ -212,6 +235,7 @@ static ssize_t bw_odr_store(struct device *dev, struct device_attribute *attr,
 
 	return count;
 }
+#endif
 
 static ssize_t pwr_show(struct device *dev, struct device_attribute *attr,
 			char *buf)
@@ -450,8 +474,9 @@ static ssize_t self_test_show(struct device *dev, struct device_attribute *attr,
 	else
 		return snprintf(buf, PAGE_SIZE, "gyro self test success\n");
 }
-
+#ifndef CONFIG_SMI230_DATA_SYNC
 static IIO_DEVICE_ATTR_RW(bw_odr, 0);
+#endif
 static IIO_DEVICE_ATTR_RW(pwr, 0);
 static IIO_DEVICE_ATTR_RW(range, 0);
 static IIO_DEVICE_ATTR_RW(fifo_wm_frame, 0);
@@ -459,7 +484,9 @@ static IIO_DEVICE_ATTR_RO(reg_dump, 0);
 static IIO_DEVICE_ATTR_RO(self_test, 0);
 
 static struct attribute *smi230gyro_basic_attrs[] = {
+#ifndef CONFIG_SMI230_DATA_SYNC
 	&iio_dev_attr_bw_odr.dev_attr.attr,
+#endif
 	&iio_dev_attr_pwr.dev_attr.attr,
 	&iio_dev_attr_range.dev_attr.attr,
 	&iio_dev_attr_fifo_wm_frame.dev_attr.attr,
@@ -487,8 +514,9 @@ static int smi230gyro_data_ready_handler(struct smi230gyro_data *data,
 	s64 timestamp;
 	struct smi230_sensor_data gyro_val;
 
-	if (!iio_buffer_enabled(indio_dev))
+	if (indio_dev->active_scan_mask == NULL)
 		return 0;
+
 	mutex_lock(&data->lock);
 	timestamp = iio_get_time_ns(indio_dev);
 	ret = smi230_gyro_get_data(data, &gyro_val);
@@ -497,29 +525,27 @@ static int smi230gyro_data_ready_handler(struct smi230gyro_data *data,
 		return ret;
 	}
 
-	for_each_set_bit(chan, indio_dev->active_scan_mask,
-			 indio_dev->masklength) {
-		switch (chan) {
-		case SMI230_GYRO_X:
-			sample = gyro_val.x;
-			break;
-		case SMI230_GYRO_Y:
-			sample = gyro_val.y;
-			break;
-		case SMI230_GYRO_Z:
-			sample = gyro_val.z;
-			break;
-		default:
-			return -EINVAL;
+	if (indio_dev->active_scan_mask != NULL) {
+		for_each_set_bit(chan, indio_dev->active_scan_mask,
+				 indio_dev->masklength) {
+			switch (chan) {
+			case SMI230_GYRO_X:
+				sample = gyro_val.x;
+				break;
+			case SMI230_GYRO_Y:
+				sample = gyro_val.y;
+				break;
+			case SMI230_GYRO_Z:
+				sample = gyro_val.z;
+				break;
+			default:
+				return -EINVAL;
+			}
+			data->buf[i++] = sample;
 		}
-		data->buf[i++] = sample;
-	}
 
-	ret = iio_push_to_buffers_with_timestamp(indio_dev, data->buf,
-						 timestamp);
-	if (ret) {
-		mutex_unlock(&data->lock);
-		return ret;
+		iio_push_to_buffers_with_timestamp(indio_dev, data->buf,
+						   timestamp);
 	}
 
 	mutex_unlock(&data->lock);
@@ -611,6 +637,9 @@ static int smi230gyro_fifo_full_handler(struct smi230gyro_data *data,
 	s64 interval, timestamp;
 	s16 sample;
 
+	if (indio_dev->active_scan_mask == NULL)
+		return 0;
+
 	mutex_lock(&data->lock);
 	ret = smi230gyro_get_fifo_length_in_frames(data,
 						   &fifo_length_in_frames);
@@ -636,7 +665,7 @@ static int smi230gyro_fifo_full_handler(struct smi230gyro_data *data,
 
 	interval = smi230gyro_calc_sample_time_interval(data, sample_count);
 
-	if (!data->first_irq) {
+	if (!data->first_irq && (indio_dev->active_scan_mask != NULL)) {
 		for (i = 0; i < sample_count; i++) {
 			int j = 0;
 			int chan = 0;
@@ -684,6 +713,9 @@ static int smi230gyro_fifo_wm_handler(struct smi230gyro_data *data,
 	s16 sample;
 	bool repeat = false;
 
+	if (indio_dev->active_scan_mask == NULL)
+		return 0;
+
 	mutex_lock(&data->lock);
 
 	ret = smi230gyro_get_fifo_length_in_frames(data,
@@ -716,7 +748,8 @@ static int smi230gyro_fifo_wm_handler(struct smi230gyro_data *data,
 		//ignore first irq
 		//ignore fifo data from next irq
 		if ((!data->first_irq) && (!repeat) &&
-		    (sample_count >= data->cfg.fifo_wm_in_frame)) {
+		    (sample_count >= data->cfg.fifo_wm_in_frame) &&
+		    (indio_dev->active_scan_mask != NULL)) {
 			for (i = 0; i < sample_count; i++) {
 				int j = 0;
 				int chan = 0;
@@ -814,7 +847,7 @@ static int smi230gyro_config_interrupt_pin(struct smi230gyro_data *data,
 {
 	int ret;
 
-	if (IS_ENABLED(CONFIG_SMI230_GYRO_INT3)) {
+	if (IS_ENABLED(CONFIG_SMI230_DATA_SYNC)) {
 		data->cfg.int_conf.fields.int3_od = SMI230_INT_MODE_PUSH_PULL;
 		data->cfg.int_conf.fields.int3_lvl = data->cfg.irq_type;
 		ret = regmap_write(data->regmap,
@@ -822,35 +855,60 @@ static int smi230gyro_config_interrupt_pin(struct smi230gyro_data *data,
 				   data->cfg.int_conf.value);
 		if (ret)
 			return ret;
-
-		if (IS_ENABLED(CONFIG_SMI230_DATA_READY))
-			data->cfg.data_int_mapping.fields.int3_data = 1;
-		else if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL))
-			data->cfg.data_int_mapping.fields.int3_fifo = 1;
-		else if (IS_ENABLED(CONFIG_SMI230_FIFO_WM))
-			data->cfg.data_int_mapping.fields.int3_fifo = 1;
-
-	} else if (IS_ENABLED(CONFIG_SMI230_GYRO_INT4)) {
-		data->cfg.int_conf.fields.int4_od = SMI230_INT_MODE_PUSH_PULL;
-		data->cfg.int_conf.fields.int4_lvl = data->cfg.irq_type;
+		data->cfg.data_int_mapping.fields.int3_data = 1;
 		ret = regmap_write(data->regmap,
-				   SMI230_GYRO_INT3_INT4_IO_CONF_REG,
-				   data->cfg.int_conf.value);
+				   SMI230_GYRO_INT3_INT4_IO_MAP_REG,
+				   data->cfg.data_int_mapping.value);
 		if (ret)
 			return ret;
+		data->cfg.int_ctrl.fields.data_en = 1;
+		ret = regmap_write(data->regmap, SMI230_GYRO_INT_CTRL_REG,
+				   data->cfg.int_ctrl.value);
+		if (ret) {
+			return -EIO;
+		}
+	} else {
+		if (IS_ENABLED(CONFIG_SMI230_GYRO_INT3)) {
+			data->cfg.int_conf.fields.int3_od =
+				SMI230_INT_MODE_PUSH_PULL;
+			data->cfg.int_conf.fields.int3_lvl = data->cfg.irq_type;
+			ret = regmap_write(data->regmap,
+					   SMI230_GYRO_INT3_INT4_IO_CONF_REG,
+					   data->cfg.int_conf.value);
+			if (ret)
+				return ret;
 
-		if (IS_ENABLED(CONFIG_SMI230_DATA_READY))
-			data->cfg.data_int_mapping.fields.int4_data = 1;
-		else if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL))
-			data->cfg.data_int_mapping.fields.int4_fifo = 1;
-		else if (IS_ENABLED(CONFIG_SMI230_FIFO_WM))
-			data->cfg.data_int_mapping.fields.int4_fifo = 1;
+			if (IS_ENABLED(CONFIG_SMI230_DATA_READY))
+				data->cfg.data_int_mapping.fields.int3_data = 1;
+			else if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL))
+				data->cfg.data_int_mapping.fields.int3_fifo = 1;
+			else if (IS_ENABLED(CONFIG_SMI230_FIFO_WM))
+				data->cfg.data_int_mapping.fields.int3_fifo = 1;
+
+		} else if (IS_ENABLED(CONFIG_SMI230_GYRO_INT4)) {
+			data->cfg.int_conf.fields.int4_od =
+				SMI230_INT_MODE_PUSH_PULL;
+			data->cfg.int_conf.fields.int4_lvl = data->cfg.irq_type;
+			ret = regmap_write(data->regmap,
+					   SMI230_GYRO_INT3_INT4_IO_CONF_REG,
+					   data->cfg.int_conf.value);
+			if (ret)
+				return ret;
+
+			if (IS_ENABLED(CONFIG_SMI230_DATA_READY))
+				data->cfg.data_int_mapping.fields.int4_data = 1;
+			else if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL))
+				data->cfg.data_int_mapping.fields.int4_fifo = 1;
+			else if (IS_ENABLED(CONFIG_SMI230_FIFO_WM))
+				data->cfg.data_int_mapping.fields.int4_fifo = 1;
+		}
+
+		ret = regmap_write(data->regmap,
+				   SMI230_GYRO_INT3_INT4_IO_MAP_REG,
+				   data->cfg.data_int_mapping.value);
+		if (ret)
+			return ret;
 	}
-
-	ret = regmap_write(data->regmap, SMI230_GYRO_INT3_INT4_IO_MAP_REG,
-			   data->cfg.data_int_mapping.value);
-	if (ret)
-		return ret;
 
 	return 0;
 }
@@ -869,9 +927,12 @@ static int smi230gyro_request_irq(struct smi230gyro_data *data,
 
 	irq = of_irq_get_byname(dvnode, "GYRO_INT");
 	desc = irq_get_irq_data(irq);
+
+#ifndef CONFIG_SMI230_DATA_SYNC
 	if (!desc)
 		return dev_err_probe(data->dev, -EINVAL,
 				     "GYRO Could not find IRQ %d\n", irq);
+#endif
 
 	irq_type = irqd_get_trigger_type(desc);
 	data->cfg.irq = irq;
@@ -968,6 +1029,9 @@ static int smi230gyro_set_trigger_state(struct iio_trigger *trig, bool enable)
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
 	struct smi230gyro_data *data = iio_priv(indio_dev);
 
+	if (IS_ENABLED(CONFIG_SMI230_DATA_SYNC))
+		return 0;
+
 	data->first_irq = enable;
 	ret = regmap_read(data->regmap, SMI230_GYRO_INT_CTRL_REG, &val);
 	if (ret) {
@@ -1017,6 +1081,7 @@ int smi230gyro_core_probe(struct device *dev, struct regmap *regmap)
 
 	data = iio_priv(indio_dev);
 	dev_set_drvdata(dev, indio_dev);
+	drv_data = data;
 	data->dev = dev;
 	data->regmap = regmap;
 	mutex_init(&data->lock);

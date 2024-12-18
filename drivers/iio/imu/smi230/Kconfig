@@ -29,6 +29,7 @@ choice
 	help
 	  Note: data-ready, fifo-full and fifo-wm are not supported at the same time, that is to say:
 	  Choose one of the three operation modes to build the driver.
+	default SMI230_DATA_READY
 
 	config SMI230_DATA_READY
 		bool "Enable data-ready interrupt"
@@ -37,12 +38,15 @@ choice
 		bool "Enable fifo-full interrupt"
 
 	config SMI230_FIFO_WM
-		bool "Enable fifo-wm interrupt"		
+		bool "Enable fifo-wm interrupt"
+
+	config SMI230_DATA_SYNC
+		bool "Enable data-sync interrupt"	
 endchoice
 
 choice
 	prompt "Select ACC interrupt ouput pin"
-	depends on SMI230
+	depends on SMI230 && !SMI230_DATA_SYNC
 	default SMI230_ACC_INT2
 
     config SMI230_ACC_INT1
@@ -58,7 +62,7 @@ endchoice
 
 choice
 	prompt "Select GYRO interrupt ouput pin"
-	depends on SMI230
+	depends on SMI230 && !SMI230_DATA_SYNC
 	default SMI230_GYRO_INT4
 
     config SMI230_GYRO_INT3
@@ -70,6 +74,21 @@ choice
 		bool "use int4 as source"
 		help
 	 	  This maps the GYRO interrupt to int4
+endchoice
+
+choice
+	prompt "Interrupt Features"
+	depends on SMI230 
+	default SMI230_INT_FEATURE_OFF
+
+    config SMI230_INT_FEATURE_ON
+		bool "activate interrupt features"
+		help
+	 	  This maps the FW interrupt to int2
+
+    config SMI230_INT_FEATURE_OFF
+		bool "deactivate interrupt features"
+		
 endchoice
 
 endif  # SMI230
