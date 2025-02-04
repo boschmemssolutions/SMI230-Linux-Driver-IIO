@@ -46,6 +46,7 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/spi/spi.h>
+#include <linux/version.h>
 
 #include "smi230.h"
 
@@ -94,6 +95,33 @@ static int smi230acc_spi_probe(struct spi_device *spi)
 	return smi230acc_core_probe(&spi->dev, regmap);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+static void smi230acc_spi_remove(struct spi_device *spi)
+{
+	struct device *dev = &spi->dev;
+	smi230acc_core_remove(dev);
+}
+#else
+static int smi230acc_spi_remove(struct spi_device *spi)
+{
+	struct device *dev = &spi->dev;
+	return smi230acc_core_remove(dev);
+}
+#endif
+
+static int __maybe_unused smi230acc_spi_suspend(struct device *dev)
+{
+	return smi230acc_core_suspend(dev);
+}
+
+static int __maybe_unused smi230acc_spi_resume(struct device *dev)
+{
+	return smi230acc_core_resume(dev);
+}
+
+static const struct dev_pm_ops smi230acc_spi_pm_ops = { SET_SYSTEM_SLEEP_PM_OPS(
+	smi230acc_spi_suspend, smi230acc_spi_resume) };
+
 static const struct spi_device_id smi230acc_spi_id[] = { { "smi230acc", 0 },
 							 {} };
 MODULE_DEVICE_TABLE(spi, smi230acc_spi_id);
@@ -106,10 +134,12 @@ MODULE_DEVICE_TABLE(of, smi230acc_of_match);
 
 static struct spi_driver smi230acc_spi_driver = {
 	.probe = smi230acc_spi_probe,
+	.remove = smi230acc_spi_remove,
 	.id_table = smi230acc_spi_id,
 	.driver = {
 		.of_match_table = smi230acc_of_match,
 		.name = "smi230acc_spi",
+		.pm = &smi230acc_spi_pm_ops,
 	},
 };
 
@@ -133,6 +163,34 @@ static int smi230gyro_spi_probe(struct spi_device *spi)
 	return smi230gyro_core_probe(&spi->dev, regmap);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+static void smi230gyro_spi_remove(struct spi_device *spi)
+{
+	struct device *dev = &spi->dev;
+	smi230gyro_core_remove(dev);
+}
+#else
+static int smi230gyro_spi_remove(struct spi_device *spi)
+{
+	struct device *dev = &spi->dev;
+	return smi230gyro_core_remove(dev);
+}
+#endif
+
+static int __maybe_unused smi230gyro_spi_suspend(struct device *dev)
+{
+	return smi230gyro_core_suspend(dev);
+}
+
+static int __maybe_unused smi230gyro_spi_resume(struct device *dev)
+{
+	return smi230gyro_core_resume(dev);
+}
+
+static const struct dev_pm_ops smi230gyro_spi_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(smi230gyro_spi_suspend, smi230gyro_spi_resume)
+};
+
 static const struct spi_device_id smi230gyro_spi_id[] = { { "smi230gyro", 0 },
 							  {} };
 MODULE_DEVICE_TABLE(spi, smi230gyro_spi_id);
@@ -145,10 +203,12 @@ MODULE_DEVICE_TABLE(of, smi230gyro_of_match);
 
 static struct spi_driver smi230gyro_spi_driver = {
 	.probe = smi230gyro_spi_probe,
+	.remove = smi230gyro_spi_remove,
 	.id_table = smi230gyro_spi_id,
 	.driver = {
 		.of_match_table = smi230gyro_of_match,
 		.name = "smi230gyro_spi",
+		.pm = &smi230gyro_spi_pm_ops,
 	},
 };
 

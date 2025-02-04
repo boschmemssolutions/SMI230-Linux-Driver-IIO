@@ -926,32 +926,51 @@ static int smi230gyro_request_irq(struct smi230gyro_data *data,
 		return -ENODEV;
 
 	irq = of_irq_get_byname(dvnode, "GYRO_INT");
-	desc = irq_get_irq_data(irq);
 
-#ifndef CONFIG_SMI230_DATA_SYNC
-	if (!desc)
-		return dev_err_probe(data->dev, -EINVAL,
-				     "GYRO Could not find IRQ %d\n", irq);
-#endif
+	if (irq >= 0) {
+		desc = irq_get_irq_data(irq);
 
-	irq_type = irqd_get_trigger_type(desc);
-	data->cfg.irq = irq;
-	data->cfg.irq_type = irq_type;
+		if (!desc)
+			return dev_err_probe(data->dev, -EINVAL,
+					     "GYRO Could not find IRQ %d\n",
+					     irq);
 
-	ret = devm_request_threaded_irq(data->dev, irq, smi230gyro_irq_handler,
-					smi230gyro_irq_thread_handler, irq_type,
-					indio_dev->name, indio_dev);
+		irq_type = irqd_get_trigger_type(desc);
+		data->cfg.irq = irq;
+		data->cfg.irq_type = irq_type;
 
-	if (ret)
-		return dev_err_probe(data->dev, ret,
-				     "GYRO Failed to request IRQ\n");
+		ret = devm_request_threaded_irq(data->dev, irq,
+						smi230gyro_irq_handler,
+						smi230gyro_irq_thread_handler,
+						irq_type, indio_dev->name,
+						indio_dev);
 
-	ret = smi230gyro_config_interrupt_pin(data, indio_dev);
-	if (ret)
-		return dev_err_probe(data->dev, ret,
-				     "GYRO Failed to config interrupt pin\n");
+		if (ret)
+			return dev_err_probe(data->dev, ret,
+					     "GYRO Failed to request IRQ\n");
 
-	return 0;
+		ret = smi230gyro_config_interrupt_pin(data, indio_dev);
+		if (ret)
+			return dev_err_probe(
+				data->dev, ret,
+				"GYRO Failed to config interrupt pin\n");
+
+		return 0;
+
+	} else {
+		if (IS_ENABLED(CONFIG_SMI230_DATA_SYNC)) {
+			data->cfg.irq_type = IRQ_TYPE_EDGE_RISING;
+			ret = smi230gyro_config_interrupt_pin(data, indio_dev);
+			if (ret)
+				return dev_err_probe(
+					data->dev, ret,
+					"GYRO Failed to config interrupt pin\n");
+
+			return 0;
+		} else {
+			return irq;
+		}
+	}
 }
 
 static int smi230gyro_config_fifo(struct smi230gyro_data *data)
@@ -1002,7 +1021,7 @@ static int smi230gyro_init(struct smi230gyro_data *data,
 
 	ret = smi230gyro_request_irq(data, indio_dev);
 	if (ret)
-		return ret;
+		dev_info(data->dev, "request_irq was not success");
 
 	if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL) ||
 	    IS_ENABLED(CONFIG_SMI230_FIFO_WM)) {
@@ -1127,4 +1146,27 @@ int smi230gyro_core_probe(struct device *dev, struct regmap *regmap)
 		return dev_err_probe(dev, ret,
 				     "Register IIO GYRO device failed\n");
 	return 0;
+}
+
+int smi230gyro_core_remove(struct device *dev)
+{
+	return 0;
+}
+
+int smi230gyro_core_suspend(struct device *dev)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct smi230gyro_data *data = iio_priv(indio_dev);
+
+	data->cfg.pwr_ctrl.fields.pwr = SMI230_GYRO_PM_SUSPEND;
+	return smi230gyro_set_power(data, data->cfg.pwr_ctrl.fields.pwr);
+}
+
+int smi230gyro_core_resume(struct device *dev)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct smi230gyro_data *data = iio_priv(indio_dev);
+
+	data->cfg.pwr_ctrl.fields.pwr = SMI230_GYRO_PM_NORMAL;
+	return smi230gyro_set_power(data, data->cfg.pwr_ctrl.fields.pwr);
 }

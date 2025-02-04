@@ -74,6 +74,33 @@ static int smi230acc_i2c_probe(struct i2c_client *i2c,
 	return smi230acc_core_probe(dev, regmap);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+static void smi230acc_i2c_remove(struct i2c_client *i2c)
+{
+	struct device *dev = &i2c->dev;
+	smi230acc_core_remove(dev);
+}
+#else
+static int smi230acc_i2c_remove(struct i2c_client *i2c)
+{
+	struct device *dev = &i2c->dev;
+	return smi230acc_core_remove(dev);
+}
+#endif
+
+static int __maybe_unused smi230acc_i2c_suspend(struct device *dev)
+{
+	return smi230acc_core_suspend(dev);
+}
+
+static int __maybe_unused smi230acc_i2c_resume(struct device *dev)
+{
+	return smi230acc_core_resume(dev);
+}
+
+static const struct dev_pm_ops smi230acc_i2c_pm_ops = { SET_SYSTEM_SLEEP_PM_OPS(
+	smi230acc_i2c_suspend, smi230acc_i2c_resume) };
+
 static const struct i2c_device_id smi230acc_i2c_id[] = { { "smi230acc", 0 },
 							 {} };
 MODULE_DEVICE_TABLE(i2c, smi230acc_i2c_id);
@@ -86,10 +113,12 @@ MODULE_DEVICE_TABLE(of, smi230acc_of_match);
 
 static struct i2c_driver smi230acc_i2c_driver = {
 	.probe = smi230acc_i2c_probe,
+	.remove = smi230acc_i2c_remove,
 	.id_table = smi230acc_i2c_id,
 	.driver = {
 		.of_match_table = smi230acc_of_match,
 		.name = "smi230acc_i2c",
+		.pm = &smi230acc_i2c_pm_ops,
 	},
 };
 
@@ -120,6 +149,34 @@ static int smi230gyro_i2c_probe(struct i2c_client *i2c,
 	return smi230gyro_core_probe(dev, regmap);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+static void smi230gyro_i2c_remove(struct i2c_client *i2c)
+{
+	struct device *dev = &i2c->dev;
+	smi230gyro_core_remove(dev);
+}
+#else
+static int smi230gyro_i2c_remove(struct i2c_client *i2c)
+{
+	struct device *dev = &i2c->dev;
+	return smi230gyro_core_remove(dev);
+}
+#endif
+
+static int __maybe_unused smi230gyro_i2c_suspend(struct device *dev)
+{
+	return smi230gyro_core_suspend(dev);
+}
+
+static int __maybe_unused smi230gyro_i2c_resume(struct device *dev)
+{
+	return smi230gyro_core_resume(dev);
+}
+
+static const struct dev_pm_ops smi230gyro_i2c_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(smi230gyro_i2c_suspend, smi230gyro_i2c_resume)
+};
+
 static const struct i2c_device_id smi230gyro_i2c_id[] = { { "smi230gyro", 0 },
 							  {} };
 MODULE_DEVICE_TABLE(i2c, smi230gyro_i2c_id);
@@ -132,10 +189,12 @@ MODULE_DEVICE_TABLE(of, smi230gyro_of_match);
 
 static struct i2c_driver smi230gyro_i2c_driver = {
 	.probe = smi230gyro_i2c_probe,
+	.remove = smi230gyro_i2c_remove,
 	.id_table = smi230gyro_i2c_id,
 	.driver = {
 		.of_match_table = smi230gyro_of_match,
 		.name = "smi230gyro_i2c",
+		.pm = &smi230gyro_i2c_pm_ops,
 	},
 };
 

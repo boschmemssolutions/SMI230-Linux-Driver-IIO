@@ -2018,29 +2018,37 @@ static int smi230acc_request_irq(struct smi230acc_data *data,
 		return -ENODEV;
 
 	irq = of_irq_get_byname(dvnode, "ACC_INT");
-	desc = irq_get_irq_data(irq);
-	if (!desc)
-		return dev_err_probe(data->dev, -EINVAL,
-				     "ACC Could not find IRQ %d\n", irq);
+	if (irq >= 0) {
+		desc = irq_get_irq_data(irq);
+		if (!desc)
+			return dev_err_probe(data->dev, -EINVAL,
+					     "ACC Could not find IRQ %d\n",
+					     irq);
 
-	irq_type = irqd_get_trigger_type(desc);
-	data->cfg.irq = irq;
-	data->cfg.irq_type = irq_type;
+		irq_type = irqd_get_trigger_type(desc);
+		data->cfg.irq = irq;
+		data->cfg.irq_type = irq_type;
 
-	ret = devm_request_threaded_irq(data->dev, irq, smi230acc_irq_handler,
-					smi230acc_irq_thread_handler, irq_type,
-					indio_dev->name, indio_dev);
+		ret = devm_request_threaded_irq(data->dev, irq,
+						smi230acc_irq_handler,
+						smi230acc_irq_thread_handler,
+						irq_type, indio_dev->name,
+						indio_dev);
 
-	if (ret)
-		return dev_err_probe(data->dev, ret,
-				     "ACC Failed to request IRQ\n");
+		if (ret)
+			return dev_err_probe(data->dev, ret,
+					     "ACC Failed to request IRQ\n");
 
-	ret = smi230acc_config_interrupt_pin(data, indio_dev);
-	if (ret)
-		return dev_err_probe(data->dev, ret,
-				     "ACC Failed to config interrupt pin\n");
+		ret = smi230acc_config_interrupt_pin(data, indio_dev);
+		if (ret)
+			return dev_err_probe(
+				data->dev, ret,
+				"ACC Failed to config interrupt pin\n");
 
-	return 0;
+		return 0;
+	} else {
+		return irq;
+	}
 }
 
 static int smi230acc_config_fifo(struct smi230acc_data *data)
@@ -2081,6 +2089,13 @@ static int smi230acc_init(struct smi230acc_data *data,
 	int ret = 0;
 	u16 datasync_config = 0;
 
+#if defined(CONFIG_SMI230_INT_FEATURE_ON) || defined(CONFIG_SMI230_DATA_SYNC)
+	ret = smi230_acc_soft_reset(data);
+	if (ret)
+		return ret;
+	msleep(100);
+#endif
+
 	//1. enable power for acc configuration
 	ret = regmap_write(data->regmap, SMI230_ACC_PWR_CONF_REG, 0x0);
 	if (ret)
@@ -2094,12 +2109,11 @@ static int smi230acc_init(struct smi230acc_data *data,
 		return ret;
 
 #if defined(CONFIG_SMI230_INT_FEATURE_ON) || defined(CONFIG_SMI230_DATA_SYNC)
-	ret = smi230_acc_soft_reset(data);
-	if (ret)
-		return ret;
+
 	ret = smi230_acc_write_config_file(data);
 	if (ret)
 		return ret;
+
 	dev_info(data->dev, "Write config file OK");
 #endif
 
@@ -2109,7 +2123,7 @@ static int smi230acc_init(struct smi230acc_data *data,
 
 	ret = smi230acc_request_irq(data, indio_dev);
 	if (ret)
-		return -EINVAL;
+		dev_info(data->dev, "request_irq was not success");
 
 	if (IS_ENABLED(CONFIG_SMI230_FIFO_FULL) ||
 	    IS_ENABLED(CONFIG_SMI230_FIFO_WM)) {
@@ -2263,7 +2277,7 @@ static const struct iio_trigger_ops smi230acc_trigger_ops = {
 
 int smi230acc_core_probe(struct device *dev, struct regmap *regmap)
 {
-	int ret, chip_id = 0;
+	int ret, i = 0, chip_id = 0;
 	struct iio_dev *indio_dev;
 	struct smi230acc_data *data;
 
@@ -2277,15 +2291,16 @@ int smi230acc_core_probe(struct device *dev, struct regmap *regmap)
 	data->regmap = regmap;
 	mutex_init(&data->lock);
 
-	ret = regmap_read(data->regmap, SMI230_ACC_CHIP_ID_REG, &chip_id);
-	if (ret) {
-		msleep(1);
+	for (i = 0; i < 5; i++) {
 		ret = regmap_read(data->regmap, SMI230_ACC_CHIP_ID_REG,
 				  &chip_id);
-		if (ret)
-			return dev_err_probe(dev, ret,
-					     "Read ACC chip id failed\n");
+		if (ret == 0)
+			break;
+		msleep(2);
 	}
+
+	if (ret)
+		return dev_err_probe(dev, ret, "Read ACC chip id failed\n");
 
 	if (chip_id != SMI230_ACC_CHIP_ID)
 		dev_info(dev, "Unknown ACC chip id: 0x%04x\n", chip_id);
@@ -2324,6 +2339,25 @@ int smi230acc_core_probe(struct device *dev, struct regmap *regmap)
 				     "Register IIO ACC device failed\n");
 
 	return 0;
+}
+
+int smi230acc_core_remove(struct device *dev)
+{
+	return 0;
+}
+
+int smi230acc_core_suspend(struct device *dev)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct smi230acc_data *data = iio_priv(indio_dev);
+	return smi230acc_set_power(data, SMI230_ACC_PM_SUSPEND);
+}
+
+int smi230acc_core_resume(struct device *dev)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct smi230acc_data *data = iio_priv(indio_dev);
+	return smi230acc_set_power(data, SMI230_ACC_PM_ACTIVE);
 }
 
 MODULE_AUTHOR("Jianping Shen <Jianping.Shen@de.bosch.com>");

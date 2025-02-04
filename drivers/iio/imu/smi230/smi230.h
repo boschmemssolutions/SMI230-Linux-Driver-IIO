@@ -656,7 +656,19 @@ struct smi230gyro_data {
 
 int smi230acc_core_probe(struct device *dev, struct regmap *regmap);
 
+int smi230acc_core_remove(struct device *dev);
+
+int smi230acc_core_suspend(struct device *dev);
+
+int smi230acc_core_resume(struct device *dev);
+
 int smi230gyro_core_probe(struct device *dev, struct regmap *regmap);
+
+int smi230gyro_core_remove(struct device *dev);
+
+int smi230gyro_core_suspend(struct device *dev);
+
+int smi230gyro_core_resume(struct device *dev);
 
 int smi230gyro_read_registers(unsigned int reg, void *val, size_t val_count);
 
